@@ -701,7 +701,7 @@
 
     <p class="hero-tag">Available for work &nbsp;·&nbsp; Based in Sydney, AU</p>
     <span class="hero-name" id="scramble-name">YOUR<br><span class="accent">NAME</span></span>
-    <p class="hero-subtitle">Developer &amp; Creative Technologist</p>
+    <p class="hero-subtitle">Cybersecurity &amp; Information Technology</p>
 
     <div class="hero-bottom">
       <div class="hero-scroll-hint">
@@ -744,28 +744,16 @@
       <div>
         <div class="about-body reveal reveal-delay-1">
           <p>
-            Hey! I'm a <strong>full-stack developer</strong> passionate about crafting
-            digital experiences that are both technically solid and visually compelling.
-            I love the intersection of design and engineering.
+            Hey! I'm a <strong>Cybersecurity Student</strong> passionate about protecting
+            and securing digital environments. I love the intersection of technology and security 
+            especially in the blue team.
           </p>
           <p>
-            I specialise in <strong>React, Node.js, and cloud infrastructure</strong>,
-            with a strong eye for UI/UX. Whether it's a startup MVP or a complex
-            enterprise system, I bring the same level of care and craft to every project.
-          </p>
-          <p>
-            When I'm not coding, you'll find me exploring the streets of Sydney,
-            sketching ideas in Figma, or nerding out over typography.
+            I specialise in <strong> Networking, Cybersecurity, risk analysis and incidence response</strong>,
+            with a strong eye for blue teaming. Hands on experience through Uni external platforms like TryHackMe,
+            HackTheBox and LetsDefend.io strengthens my understandings and skills regarding Cybersecurity.
           </p>
         </div>
-        <div class="about-img-wrap reveal reveal-delay-3">
-          <div class="about-img-placeholder">
-            Your photo here
-          </div>
-          <div class="about-img-accent"></div>
-        </div>
-      </div>
-    </div>
   </section>
 
   <!-- ─── PROJECTS ──────────────────────────────── -->
