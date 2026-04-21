@@ -105,7 +105,7 @@
 </header>
 
 <section class="hero">
-  <h2>Hi, I'm Jason 👋</h2>
+  <h2>Hi, I'm 👋</h2>
   <p>Aspiring Developer | Cybersecurity | Data Projects</p>
 </section>
 
