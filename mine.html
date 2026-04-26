@@ -105,6 +105,11 @@ let mx=0,my=0,playerInv=false,invTimer=0,flashT=0;
 // entities
 let enemies=[],bullets=[],targets=[],particles=[];
 let bossShootTimer=2.5,bossPatIdx=0,targetSpawnTimer=4;
+let hexAttacks=[],hexPatTimer=0; // level-10 hex boss screen attacks
+let hexLasers=[];                 // lasers fired at ≤5 HP
+
+// mine-click lock: after taking damage, player can't click mines for 1s
+let mineClickLock=0;
 
 // UI
 let uiButtons=[],lastHovBtn=-1,rebinding=null;
@@ -172,8 +177,12 @@ function placeMines(sr,sc){
 function revealCell(r,c,cascade=false){
   if(r<0||r>=rows||c<0||c>=cols)return;
   const cell=grid[r][c];if(cell.revealed||cell.flagged)return;
+  // During invincibility window: block ALL tile interaction (prevents mine-dodging exploit)
+  if(!cascade&&(playerInv||mineClickLock>0))return;
   if(!boardReady)placeMines(r,c);
-  if(cell.mine){cell.revealed=true;cell.heat=1;sfx('mine');loseLife();boom(gridOffX+c*cellSize+cellSize/2,gridOffY+r*cellSize+cellSize/2,'#ff4400');screenShake=.4;return;}
+  if(cell.mine){
+    cell.revealed=true;cell.heat=1;sfx('mine');loseLife();boom(gridOffX+c*cellSize+cellSize/2,gridOffY+r*cellSize+cellSize/2,'#ff4400');screenShake=.4;return;
+  }
   cell.revealed=true;
   if(!cascade)sfx('reveal');else sfx('reveal',true);
   score+=10;
@@ -198,7 +207,8 @@ function checkWin(){
 // ════════════════════════════════════════════════════════════
 function loseLife(){
   if(playerInv)return;lives--;boom(mx,my,'#ff0088');screenShake=.35;
-  if(lives<=0){sfx('death');playerInv=false;invTimer=0;flashT=0;setState('gameOver');}
+  mineClickLock=1.0; // 1 second grace: can't click mines right after being hit
+  if(lives<=0){sfx('death');playerInv=false;invTimer=0;flashT=0;mineClickLock=0;setState('gameOver');}
   else{sfx('hurt');playerInv=true;invTimer=INV_TIME;flashT=INV_TIME;}
 }
 
@@ -208,14 +218,181 @@ function loseLife(){
 function edgePos(){const s=Math.floor(Math.random()*4);if(s===0)return{x:Math.random()*canvas.width,y:-55};if(s===1)return{x:canvas.width+55,y:Math.random()*canvas.height};if(s===2)return{x:Math.random()*canvas.width,y:canvas.height+55};return{x:-55,y:Math.random()*canvas.height};}
 function mkEnemy(type){const{x,y}=edgePos(),spd=55+currentLevel*4;const base={x,y,type,w:Math.random()*Math.PI*2,ws:2+Math.random()*2,hp:1,maxHp:1};if(type==='fast')return{...base,r:11,speed:spd*1.65,color:'#ff9900',ws:5};if(type==='tank')return{...base,r:20,speed:spd*.65,color:'#aa44ff',hp:3,maxHp:3};return{...base,r:14,speed:spd,color:'#ff2255'};}
 function mkBoss(){return{x:canvas.width/2,y:-110,type:'boss',r:44,speed:34+currentLevel*2,color:'#cc0033',hp:5+Math.floor(currentLevel/5),maxHp:5+Math.floor(currentLevel/5),w:0,ws:.7,chargeT:3.5,charging:false,cvx:0,cvy:0,chargeDur:0,eyeA:0};}
+
+// ── HEXAGON BOSS  (level 10 / every 10th level) ─────────────
+function mkHexBoss(){
+  return{x:canvas.width/2,y:canvas.height/2-60,type:'hexboss',r:58,
+    hp:10,maxHp:10,w:0,ws:.4,
+    color:'#8800ff',atkTimer:2.2,atkPhase:0};
+}
+// Hex attack zones: warn for warnDur, then active for actDur, hit player if inside
+function spawnHexAtk(type){
+  const W=canvas.width,H=canvas.height;
+  const warnDur=1.4,actDur=0.85;
+  const base={type,warnDur,actDur,warnT:warnDur,actT:-1,done:false};
+  if(type==='hbar'){   // full-width horizontal strip
+    const th=H*.22+Math.random()*H*.15,y=H*.12+Math.random()*(H*.65-th);
+    return{...base,x:0,y,w:W,h:th};
+  }else if(type==='vbar'){  // full-height vertical strip
+    const tw=W*.18+Math.random()*W*.14,x=W*.08+Math.random()*(W*.78-tw);
+    return{...base,x,y:0,w:tw,h:H};
+  }else if(type==='quad'){  // quarter of screen
+    const qx=Math.random()<.5?0:W*.5, qy=Math.random()<.5?0:H*.5;
+    return{...base,x:qx,y:qy,w:W*.5,h:H*.5};
+  }else if(type==='cross'){  // two bars overlapping
+    const th=H*.18,tw=W*.18;
+    const cy2=H*.2+Math.random()*(H*.6-th),cx2=W*.2+Math.random()*(W*.6-tw);
+    return{...base,x:0,y:cy2,w:W,h:th,x2:cx2,y2:0,w2:tw,h2:H};
+  }else if(type==='sides'){  // two side walls, thin safe corridor in middle
+    const cw=W*.28+Math.random()*W*.18, cx2=(W-cw)/2;
+    return{...base,x:0,y:0,w:cx2,h:H, x2:cx2+cw,y2:0,w2:W-cx2-cw,h2:H};
+  }else if(type==='topbot'){  // top and bottom bars leave middle safe
+    const ch=H*.28+Math.random()*H*.18, cy2=(H-ch)/2;
+    return{...base,x:0,y:0,w:W,h:cy2, x2:0,y2:cy2+ch,w2:W,h2:H-cy2-ch};
+  }
+  return{...base,x:W*.2,y:H*.2,w:W*.6,h:H*.6}; // fallback center box
+}
+const HEX_ATKS=['hbar','vbar','quad','cross','sides','topbot'];
+function updateHexAttacks(dt){
+  for(let i=hexAttacks.length-1;i>=0;i--){
+    const a=hexAttacks[i];
+    if(a.warnT>0){a.warnT-=dt;}
+    else if(a.actT<0){a.actT=a.actDur;sfx('bshoot');}
+    else{
+      a.actT-=dt;
+      // Check player collision with active zone
+      if(!playerInv){
+        const inZone=(ax,ay,aw,ah)=>mx>=ax&&mx<=ax+aw&&my>=ay&&my<=ay+ah;
+        if(inZone(a.x,a.y,a.w,a.h))loseLife();
+        else if(a.x2!==undefined&&inZone(a.x2,a.y2,a.w2,a.h2))loseLife();
+      }
+      if(a.actT<=0)a.done=true;
+    }
+    if(a.done)hexAttacks.splice(i,1);
+  }
+}
+function tickHexBoss(boss,dt){
+  boss.atkTimer-=dt;
+  if(boss.atkTimer>0)return;
+  const hpPct=boss.hp/boss.maxHp;
+  boss.atkTimer=Math.max(.8,2.2-(1-hpPct)*1.4);
+  // Fire 1 attack (2 at low HP)
+  const pickAtk=()=>HEX_ATKS[Math.floor(Math.random()*HEX_ATKS.length)];
+  hexAttacks.push(spawnHexAtk(pickAtk()));
+  if(hpPct<.5)hexAttacks.push(spawnHexAtk(pickAtk()));
+  if(hpPct<.25)hexAttacks.push(spawnHexAtk(pickAtk()));
+  // ── Lasers at ≤5 HP ──
+  if(boss.hp<=5)spawnHexLaserBurst(boss);
+}
+
+// ── HEX BOSS LASERS ─────────────────────────────────────────
+// A laser: line from boss centre outward along a chosen angle
+// warn phase (orange outline) → active phase (thick bright beam, damages player)
+let _laserTimer=0;
+function spawnHexLaserBurst(boss){
+  _laserTimer=0; // no extra throttle, tickHexBoss already gates it
+  const W=canvas.width,H=canvas.height;
+  // pick 1-3 directions from the hex vertices + random angles
+  const rage=boss.hp<=3;
+  const count=rage?3:1+(Math.random()<.5?1:0);
+  for(let i=0;i<count;i++){
+    // Alternate between hex-aligned and random angles
+    const baseA=boss.w+i*(Math.PI/3)+(rage?Math.random()*.5:0);
+    // extend to far edge of screen
+    const ex=boss.x+Math.cos(baseA)*Math.max(W,H)*2;
+    const ey=boss.y+Math.sin(baseA)*Math.max(W,H)*2;
+    hexLasers.push({
+      x1:boss.x,y1:boss.y,
+      x2:ex,y2:ey,
+      angle:baseA,
+      warnDur:1.1,actDur:0.6,
+      warnT:1.1,actT:-1,done:false,
+      thick:rage?24:18   // active beam thickness (half-width for hit test)
+    });
+  }
+  sfx('bshoot');
+}
+
+function updateHexLasers(dt){
+  for(let i=hexLasers.length-1;i>=0;i--){
+    const l=hexLasers[i];
+    if(l.warnT>0){l.warnT-=dt;}
+    else if(l.actT<0){l.actT=l.actDur;}
+    else{
+      l.actT-=dt;
+      // Hit test: distance from cursor to the laser line segment
+      if(!playerInv){
+        const dx=l.x2-l.x1,dy=l.y2-l.y1,len=Math.hypot(dx,dy)||1;
+        const t2=Math.max(0,Math.min(1,((mx-l.x1)*dx+(my-l.y1)*dy)/(len*len)));
+        const cx2=l.x1+t2*dx,cy2=l.y1+t2*dy;
+        if(Math.hypot(mx-cx2,my-cy2)<l.thick*.5+PLAYER_R)loseLife();
+      }
+      if(l.actT<=0)l.done=true;
+    }
+    if(l.done)hexLasers.splice(i,1);
+  }
+}
+
+function rHexLasers(){
+  for(const l of hexLasers){
+    const isWarn=l.actT<0;
+    ctx.save();
+    if(isWarn){
+      // Charging glow: thin line pulsing orange→white
+      const prog=1-(l.warnT/l.warnDur); // 0→1 as warn elapses
+      ctx.globalAlpha=.35+prog*.55;
+      ctx.strokeStyle=`hsl(${40-prog*30},100%,${60+prog*30}%)`;
+      ctx.lineWidth=2+prog*6;
+      ctx.shadowColor='#ffaa00';ctx.shadowBlur=12+prog*18;
+      ctx.setLineDash([14,10]);
+      ctx.beginPath();ctx.moveTo(l.x1,l.y1);ctx.lineTo(l.x2,l.y2);ctx.stroke();
+      ctx.setLineDash([]);
+      // Beam origin flare
+      ctx.globalAlpha=prog*.8;
+      ctx.fillStyle='#ffff88';ctx.shadowBlur=24;
+      ctx.beginPath();ctx.arc(l.x1,l.y1,6+prog*10,0,Math.PI*2);ctx.fill();
+    }else{
+      // Active: thick bright beam + intense glow
+      const fade=l.actT/l.actDur;
+      ctx.globalAlpha=fade*.9+.1;
+      // Outer glow
+      ctx.strokeStyle='#ffffff';ctx.lineWidth=l.thick*2;
+      ctx.shadowColor='#cc44ff';ctx.shadowBlur=40;
+      ctx.globalAlpha*=.18;
+      ctx.beginPath();ctx.moveTo(l.x1,l.y1);ctx.lineTo(l.x2,l.y2);ctx.stroke();
+      // Core beam
+      ctx.globalAlpha=fade*.95;
+      ctx.strokeStyle='#ffffff';ctx.lineWidth=l.thick*.3;
+      ctx.shadowColor='#ee88ff';ctx.shadowBlur=20;
+      ctx.beginPath();ctx.moveTo(l.x1,l.y1);ctx.lineTo(l.x2,l.y2);ctx.stroke();
+      // Bright centre
+      ctx.strokeStyle='#ffeeFF';ctx.lineWidth=3;ctx.shadowBlur=8;
+      ctx.beginPath();ctx.moveTo(l.x1,l.y1);ctx.lineTo(l.x2,l.y2);ctx.stroke();
+      // Origin flash
+      ctx.fillStyle='#ffffff';ctx.shadowBlur=30;
+      ctx.beginPath();ctx.arc(l.x1,l.y1,l.thick*.45,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
+}
 function spawnEnemies(cfg){
-  enemies=[];bullets=[];targets=[];
+  enemies=[];bullets=[];targets=[];hexAttacks=[];
   for(let i=0;i<cfg.eNum;i++){let t='basic';if(currentLevel>=4&&Math.random()<.3)t='fast';if(currentLevel>=7&&Math.random()<.2)t='tank';enemies.push(mkEnemy(t));}
-  if(cfg.boss){enemies.push(mkBoss());bossShootTimer=2.8;bossPatIdx=0;targetSpawnTimer=5;}
+  if(cfg.boss){
+    // Every 10th level gets the hexagon boss instead
+    if(currentLevel%10===0)enemies.push(mkHexBoss());
+    else enemies.push(mkBoss());
+    bossShootTimer=2.8;bossPatIdx=0;targetSpawnTimer=5;
+  }
 }
 function updateEnemies(dt){
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i];e.w+=e.ws*dt;
+    if(e.type==='hexboss'){
+      // Hex boss stays put, just pulses — no body collision
+      e.x=canvas.width/2; e.y=canvas.height/2-50;
+      continue;
+    }
     if(e.type==='boss'){
       e.eyeA=Math.atan2(my-e.y,mx-e.x);e.chargeT-=dt;
       if(e.charging){e.x+=e.cvx*dt;e.y+=e.cvy*dt;e.chargeDur-=dt;if(e.chargeDur<=0){e.charging=false;e.chargeT=Math.max(1.8,4-currentLevel*.2);}}
@@ -347,9 +524,9 @@ function buildKBButtons(){
 }
 
 function startGame(lv){
-  currentLevel=lv;lives=MAX_LIVES;score=0;particles=[];bullets=[];targets=[];
+  currentLevel=lv;lives=MAX_LIVES;score=0;particles=[];bullets=[];targets=[];hexAttacks=[];hexLasers=[];
   playerInv=false;invTimer=0;flashT=0;keysHeld.clear();holdProcessed.clear();
-  levelTimer=0;newRecordBanner=0;
+  levelTimer=0;newRecordBanner=0;mineClickLock=0;hexPatTimer=0;
   const cfg=levelCfg(lv);initGrid(cfg.r,cfg.c,cfg.m);spawnEnemies(cfg);
   gameState='playing';
 }
@@ -390,7 +567,7 @@ canvas.addEventListener('click',e=>{
   if(gameState==='title'&&px>=canvas.width-110&&py>=canvas.height-44){toggleDev();return;}
 
   if(gameState==='playing'){
-    const boss=enemies.find(en=>en.type==='boss');
+    const boss=enemies.find(en=>en.type==='boss'||en.type==='hexboss');
     if(boss){for(let i=targets.length-1;i>=0;i--){const t=targets[i];if(Math.hypot(px-t.x,py-t.y)<t.r+10){targets.splice(i,1);sfx('target');boom(t.x,t.y,t.color,22);screenShake=.25;boss.hp--;score+=80;if(boss.hp<=0)killBoss(boss);return;}}}
     const c=Math.floor((px-gridOffX)/cellSize),r=Math.floor((py-gridOffY)/cellSize);
     if(r>=0&&r<rows&&c>=0&&c<cols)revealCell(r,c);
@@ -463,6 +640,7 @@ function update(dt){
 
   if(playerInv){invTimer-=dt;if(invTimer<=0){playerInv=false;flashT=0;}}
   if(flashT>0)flashT-=dt;
+  if(mineClickLock>0)mineClickLock=Math.max(0,mineClickLock-dt);
 
   // Hold-to-select
   const hovC=Math.floor((mx-gridOffX)/cellSize),hovR=Math.floor((my-gridOffY)/cellSize);
@@ -475,6 +653,12 @@ function update(dt){
   updateEnemies(dt);updateParticles(dt);
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(grid[r][c].heat>0)grid[r][c].heat=Math.max(0,grid[r][c].heat-dt*2);
   const boss=enemies.find(en=>en.type==='boss');
+  const hexboss=enemies.find(en=>en.type==='hexboss');
+  if(hexboss){
+    tickHexBoss(hexboss,dt);updateHexAttacks(dt);updateHexLasers(dt);
+    targetSpawnTimer-=dt;if(targetSpawnTimer<=0){spawnTarget();targetSpawnTimer=2.8+Math.random()*2.8;}
+    updateTargets(dt);
+  } else if(hexAttacks.length>0||hexLasers.length>0){updateHexAttacks(dt);updateHexLasers(dt);}
   if(boss){bossShoot(boss,dt);targetSpawnTimer-=dt;if(targetSpawnTimer<=0){spawnTarget();targetSpawnTimer=2.5+Math.random()*2.5;}updateTargets(dt);updateBullets(dt);}
   else if(bullets.length>0||targets.length>0){updateBullets(dt);updateTargets(dt);}
 }
@@ -482,7 +666,7 @@ function update(dt){
 function killBoss(boss){
   sfx('bdead');for(let n=0;n<6;n++)boom(boss.x+(Math.random()-.5)*120,boss.y+(Math.random()-.5)*120,'#ffcc00',20);
   enemies.splice(enemies.indexOf(boss),1);score+=800;lives=Math.min(lives+1,MAX_LIVES);
-  bullets=[];targets=[];screenShake=.6;checkWin();
+  bullets=[];targets=[];hexAttacks=[];hexLasers=[];screenShake=.6;checkWin();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -615,7 +799,37 @@ function rKeybinds(){
 }
 
 // ── PLAYING ──────────────────────────────────────────────────
-function rPlaying(){rGrid();rEnemies();rBullets();rTargets();rParticles();rCursor();rHUD();}
+function rPlaying(){rGrid();rHexAttacks();rHexLasers();rEnemies();rBullets();rTargets();rParticles();rCursor();rHUD();}
+
+// ── HEX ATTACK ZONES (Just Shapes and Beats style) ──────────
+function rHexAttacks(){
+  for(const a of hexAttacks){
+    const isWarn=a.actT<0;
+    const alpha=isWarn
+      ? .18+Math.sin(time*8+a.warnT*6)*.12   // pulsing orange warning
+      : .70;                                    // solid danger red
+    const col=isWarn?'#ff8800':'#ff0055';
+    const borderCol=isWarn?'#ffcc00':'#ff2266';
+    const rects=[[a.x,a.y,a.w,a.h]];
+    if(a.x2!==undefined)rects.push([a.x2,a.y2,a.w2,a.h2]);
+    ctx.save();
+    for(const[rx,ry,rw,rh] of rects){
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle=col;ctx.fillRect(rx,ry,rw,rh);
+      ctx.globalAlpha=Math.min(alpha*1.8,1);
+      ctx.strokeStyle=borderCol;ctx.lineWidth=isWarn?2.5:3;
+      ctx.strokeRect(rx+1,ry+1,rw-2,rh-2);
+    }
+    // Warning label
+    if(isWarn){
+      const cx=(a.x2!==undefined?(a.x+a.w/2+a.x2+a.w2/2)/2:a.x+a.w/2);
+      const cy=(a.x2!==undefined?(a.y+a.h/2+a.y2+a.h2/2)/2:a.y+a.h/2);
+      ctx.globalAlpha=.5+Math.sin(time*10)*.3;
+      glowTxt('⚠',cx,cy,28,'#ffcc00','#ffaa0099');
+    }
+    ctx.restore();
+  }
+}
 
 function rGrid(){
   ctx.save();ctx.shadowColor='#0055ff33';ctx.shadowBlur=24;ctx.strokeStyle='#1a3366';ctx.lineWidth=2;ctx.strokeRect(gridOffX,gridOffY,cols*cellSize,rows*cellSize);ctx.restore();
@@ -644,6 +858,33 @@ function rGrid(){
 function rEnemies(){
   for(const e of enemies){
     ctx.save();const pulse=Math.sin(time*3+e.w)*.25+.75;
+
+    if(e.type==='hexboss'){
+      // Draw hexagon shape
+      const hpPct=e.hp/e.maxHp;
+      const col=`hsl(${270+time*20},90%,${50+pulse*15}%)`;
+      ctx.shadowColor='#cc00ff';ctx.shadowBlur=40*pulse;
+      ctx.strokeStyle=col;ctx.lineWidth=5;
+      ctx.beginPath();for(let i=0;i<6;i++){const a=e.w+i*Math.PI/3;const v=e.r+Math.sin(time*2+i)*.8*4;if(i===0)ctx.moveTo(e.x+Math.cos(a)*v,e.y+Math.sin(a)*v);else ctx.lineTo(e.x+Math.cos(a)*v,e.y+Math.sin(a)*v);}ctx.closePath();ctx.stroke();
+      // Semi-transparent fill
+      ctx.fillStyle=`hsla(${270+time*20},80%,30%,.35)`;ctx.fill();
+      // Inner rings
+      for(let ri=1;ri<=3;ri++){
+        ctx.globalAlpha=.12*ri*pulse;ctx.strokeStyle='#dd88ff';ctx.lineWidth=1.2;
+        ctx.beginPath();for(let i=0;i<6;i++){const a=-e.w*ri*.5+i*Math.PI/3;const v=e.r*(.4+ri*.18);if(i===0)ctx.moveTo(e.x+Math.cos(a)*v,e.y+Math.sin(a)*v);else ctx.lineTo(e.x+Math.cos(a)*v,e.y+Math.sin(a)*v);}ctx.closePath();ctx.stroke();
+      }
+      ctx.globalAlpha=1;ctx.shadowBlur=0;
+      // Boss HP bar
+      const bw=Math.min(canvas.width*.55,460),bh=22,bx=canvas.width/2-bw/2,by=canvas.height-62;
+      glowTxt(`⚠  HEX BOSS  HP: ${e.hp} / ${e.maxHp}  ⚠`,canvas.width/2,by-18,9,'#cc44ff','#8800ff88');
+      ctx.fillStyle='#0a000f';rr(bx,by,bw,bh,5);ctx.fill();
+      if(hpPct>0){const bg=ctx.createLinearGradient(bx,0,bx+bw,0);bg.addColorStop(0,'#8800ff');bg.addColorStop(1,'#dd44ff');ctx.fillStyle=bg;rr(bx,by,bw*hpPct,bh,5);ctx.fill();}
+      ctx.strokeStyle='#aa44ff';ctx.lineWidth=1.5;rr(bx,by,bw,bh,5);ctx.stroke();
+      const fl=Math.sin(time*2.8)*.5+.5;ctx.globalAlpha=fl*.9;txt('CLICK  THE  TARGETS  TO  DAMAGE  BOSS',canvas.width/2,by+bh+16,7,'#cc88ff');
+      if(e.hp<=5){ctx.globalAlpha=(fl*.7+.3);glowTxt('⚡ LASER RAGE MODE ⚡',canvas.width/2,by+bh+32,7,'#ffaaff','#ff00ff99');}
+      ctx.globalAlpha=1;
+      ctx.restore();continue;
+    }
     if(e.type==='boss'){
       ctx.shadowColor='#ff0033';ctx.shadowBlur=38*pulse;ctx.fillStyle=e.charging?'#ff5500':e.color;
       ctx.beginPath();ctx.arc(e.x,e.y,e.r+Math.sin(e.w)*4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
@@ -671,7 +912,7 @@ function rEnemies(){
 function rBullets(){for(const b of bullets){ctx.save();ctx.shadowColor=b.color;ctx.shadowBlur=16;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(b.x,b.y,b.r*.38,0,Math.PI*2);ctx.fill();ctx.restore();}}
 
 function rTargets(){
-  const boss=enemies.find(en=>en.type==='boss');if(!boss)return;
+  const boss=enemies.find(en=>en.type==='boss'||en.type==='hexboss');if(!boss)return;
   for(const t of targets){
     ctx.save();const lf=t.life/t.maxLife,pulse=Math.sin(t.pulse)*3.5,hovering=Math.hypot(mx-t.x,my-t.y)<t.r+16;
     ctx.globalAlpha=Math.min(lf*2.5,1);ctx.translate(t.x,t.y);ctx.rotate(Math.PI/4+t.pulse*.12);
@@ -691,9 +932,9 @@ function rParticles(){for(const p of particles){ctx.globalAlpha=(p.life/p.maxLif
 
 function rCursor(){
   if(gameState==='playing'&&flashT>0&&Math.sin(time*22)>0)return;
-  const boss=(gameState==='playing'||gameState==='paused')&&enemies.find(en=>en.type==='boss');
-  const col=boss?'#ff4444':'#44aaff';
-  ctx.save();ctx.shadowColor=boss?'#ff000088':'#44aaffaa';ctx.shadowBlur=20;
+  const anyboss=(gameState==='playing'||gameState==='paused')&&enemies.find(en=>en.type==='boss'||en.type==='hexboss');
+  const col=anyboss?(anyboss.type==='hexboss'?'#cc44ff':'#ff4444'):'#44aaff';
+  ctx.save();ctx.shadowColor=anyboss?(anyboss.type==='hexboss'?'#aa00ff88':'#ff000088'):'#44aaffaa';ctx.shadowBlur=20;
   ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();ctx.arc(mx,my,PLAYER_R+4,0,Math.PI*2);ctx.stroke();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(mx,my,3,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle=col+'66';ctx.lineWidth=1.2;ctx.beginPath();
@@ -735,6 +976,13 @@ function rHUD(){
   // Best time for this level
   const recs=levelRecords[String(currentLevel)]||[];
   if(recs.length>0){txt(`Best: ${fmtTime(recs[0].time)}`,canvas.width-18,64,7,'#334455','right');}
+
+  // Mine-click lock indicator — show for full invincibility window
+  if(mineClickLock>0||playerInv){
+    ctx.save();ctx.globalAlpha=.8+Math.sin(time*14)*.2;
+    glowTxt('⛔ MINES LOCKED',canvas.width/2,canvas.height/2+110,11,'#ff4444','#ff000099');
+    ctx.restore();
+  }
 
   // Hold-mode / bottom hint
   if(keybinds.holdReveal&&keysHeld.has(keybinds.reveal)){ctx.save();ctx.globalAlpha=.85;txt(`[${keybinds.reveal.toUpperCase()}] HOLD REVEAL`,canvas.width/2,canvas.height-22,8,'#88ffcc');ctx.restore();}
