@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>48730 Cyber Security Labs — Write-Up</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:      #030804;
+      --surface: #060d07;
+      --text:    #d4ead6;
+      --muted:   #4a6b4d;
+      --accent:  #00ff41;
+      --accent2: #39e84a;
+      --accent3: #ff3860;
+      --yellow:  #ffcc00;
+      --dim:     rgba(0,255,65,0.06);
+      --border:  rgba(0,255,65,0.14);
+      --border2: rgba(0,255,65,0.06);
+      --glow:    0 0 24px rgba(0,255,65,0.2);
+      --BIG:     'Bebas Neue', sans-serif;
+      --MONO:    'Share Tech Mono', monospace;
+      --SERIF:   'Cormorant Garamond', serif;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:var(--MONO);font-size:13px;line-height:1.7;overflow-x:hidden}
+    a{color:var(--accent);text-decoration:none}
+    ::-webkit-scrollbar{width:3px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--accent)}
+
+    body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.03;pointer-events:none;z-index:9999}
+    body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.025) 0px,rgba(0,0,0,.025) 1px,transparent 1px,transparent 4px);pointer-events:none;z-index:9998}
+
+    #progress{position:fixed;top:0;left:0;height:2px;background:var(--accent);width:0%;z-index:9997;box-shadow:var(--glow);transition:width .08s linear}
+
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    .blink{animation:blink 1s step-end infinite}
+    @keyframes fu{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+    @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+
+    /* NAV */
+    nav{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:1.2rem 3rem;background:rgba(3,8,4,.9);backdrop-filter:blur(14px);border-bottom:1px solid var(--border2);z-index:900}
+    .nav-logo{font-family:var(--BIG);font-size:1.6rem;letter-spacing:.06em;color:var(--accent)}
+    .nav-links{display:flex;gap:2rem;list-style:none}
+    .nav-links a{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);transition:color .25s}
+    .nav-links a:hover{color:var(--accent)}
+
+    /* HERO */
+    #hero{
+      min-height:100vh;
+      display:flex;flex-direction:column;justify-content:flex-end;
+      padding:0 3rem 5rem;
+      position:relative;overflow:hidden;
+    }
+    .h-grid{position:absolute;inset:0;background-image:linear-gradient(var(--border2) 1px,transparent 1px),linear-gradient(90deg,var(--border2) 1px,transparent 1px);background-size:55px 55px}
+    .h-orb{position:absolute;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,65,.05) 0%,transparent 65%);top:50%;right:-100px;transform:translateY(-50%)}
+    .h-num{position:absolute;right:3rem;bottom:3rem;font-family:var(--BIG);font-size:clamp(8rem,18vw,16rem);color:rgba(0,255,65,.04);line-height:1;user-select:none}
+
+    .eyebrow{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent2);margin-bottom:1.2rem;position:relative;z-index:1;opacity:0;animation:fu .7s .2s ease forwards}
+    .hero-title{font-family:var(--BIG);font-size:clamp(4rem,10vw,9rem);line-height:.88;letter-spacing:.02em;position:relative;z-index:1;opacity:0;animation:fu .7s .4s ease forwards}
+    .hero-title .gr{color:var(--accent)}
+    .meta-row{display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:1.5rem;position:relative;z-index:1;opacity:0;animation:fu .7s .6s ease forwards}
+    .badge{font-size:9px;letter-spacing:.15em;text-transform:uppercase;padding:.3rem .8rem;border:1px solid rgba(0,255,65,.2);color:var(--accent)}
+    .badge.y{border-color:rgba(255,204,0,.25);color:var(--yellow)}
+    .badge.r{border-color:rgba(255,56,96,.2);color:var(--accent3)}
+    .stat-row{display:flex;gap:3rem;margin-top:2rem;position:relative;z-index:1;opacity:0;animation:fu .7s .8s ease forwards}
+    .ps{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .ps span{display:block;font-family:var(--BIG);font-size:1.5rem;color:var(--accent);line-height:1}
+
+    /* BODY */
+    .body{max-width:960px;margin:0 auto;padding:6rem 3rem}
+
+    /* TOC */
+    .toc{border:1px solid var(--border2);background:var(--surface);padding:1.8rem 2rem;margin-bottom:5rem}
+    .toc-title{font-family:var(--BIG);font-size:1.2rem;color:var(--accent);margin-bottom:1rem}
+    .toc-list{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:.4rem;counter-reset:toc}
+    .toc-list li a{font-size:12px;letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:.6rem;transition:color .2s}
+    .toc-list li a::before{content:counter(toc,decimal-leading-zero);counter-increment:toc;font-size:10px;color:var(--accent);opacity:.6}
+    .toc-list li a:hover{color:var(--accent)}
+
+    /* SECTION */
+    .ws{margin-bottom:5rem;scroll-margin-top:80px}
+    .ws-label{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:.8rem;margin-bottom:1rem}
+    .ws-label::before{content:'';width:20px;height:1px;background:var(--accent)}
+    .ws-heading{font-family:var(--BIG);font-size:clamp(2rem,5vw,3.5rem);letter-spacing:.04em;line-height:.95;margin-bottom:1.5rem}
+    .ws p{font-size:13px;color:var(--muted);line-height:2;margin-bottom:1.2rem}
+    .ws p strong{color:var(--text);font-weight:400}
+    .ws p .hi{color:var(--accent)}
+
+    /* TOOL GRID */
+    .tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin:1.5rem 0}
+    .tool-card{border:1px solid var(--border2);background:var(--surface);padding:1.2rem;transition:border-color .3s,box-shadow .3s}
+    .tool-card:hover{border-color:var(--border);box-shadow:var(--glow)}
+    .tool-name{font-family:var(--BIG);font-size:1.1rem;color:var(--accent);letter-spacing:.04em;margin-bottom:.4rem}
+    .tool-cat{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem}
+    .tool-desc{font-size:11px;color:var(--muted);line-height:1.7}
+
+    /* LAB CARDS */
+    .lab-list{display:flex;flex-direction:column;gap:2rem;margin:1.5rem 0}
+    .lab-card{border-left:2px solid var(--accent);background:var(--surface);padding:1.5rem 2rem;position:relative;overflow:hidden;transition:border-color .3s}
+    .lab-card::before{content:'';position:absolute;top:0;right:0;width:120px;height:100%;background:linear-gradient(90deg,transparent,rgba(0,255,65,.015));pointer-events:none}
+    .lab-card:hover{border-color:var(--accent2)}
+    .lab-week{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:.3rem}
+    .lab-title{font-family:var(--BIG);font-size:1.4rem;color:var(--text);letter-spacing:.04em;margin-bottom:.8rem}
+    .lab-body{font-size:12px;color:var(--muted);line-height:1.9}
+    .lab-body strong{color:var(--text);font-weight:400}
+    .lab-tools{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:1rem}
+    .lab-tool{font-size:9px;letter-spacing:.12em;text-transform:uppercase;padding:.2rem .6rem;border:1px solid rgba(0,255,65,.2);color:var(--accent2)}
+    .lab-tool.y{border-color:rgba(255,204,0,.2);color:var(--yellow)}
+    .lab-tool.r{border-color:rgba(255,56,96,.2);color:var(--accent3)}
+
+    /* TERMINAL BLOCK */
+    .terminal{background:#020503;border:1px solid var(--border);margin:1.5rem 0;overflow:hidden}
+    .term-header{display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;border-bottom:1px solid var(--border2);background:var(--surface)}
+    .term-dots{display:flex;gap:.4rem}
+    .term-dots span{width:8px;height:8px;border-radius:50%}
+    .term-dots span:nth-child(1){background:var(--accent3)}
+    .term-dots span:nth-child(2){background:var(--yellow)}
+    .term-dots span:nth-child(3){background:var(--accent2)}
+    .term-label{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+    .term-body{padding:1.2rem 1.4rem;font-size:12px;line-height:1.9;overflow-x:auto}
+    .term-body .prompt{color:var(--accent2)}
+    .term-body .cmd{color:var(--text)}
+    .term-body .comment{color:var(--muted)}
+    .term-body .hi{color:var(--accent)}
+
+    /* CALLOUT */
+    .callout{border-left:3px solid var(--accent);background:var(--dim);padding:1.2rem 1.5rem;margin:1.5rem 0}
+    .callout-label{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+    .callout p{font-size:12px;color:var(--muted);line-height:1.9;margin:0}
+    .callout p strong{color:var(--text);font-weight:400}
+    .callout.warn{border-color:var(--yellow);background:rgba(255,204,0,.04)}
+    .callout.warn .callout-label{color:var(--yellow)}
+    .callout.red{border-color:var(--accent3);background:rgba(255,56,96,.04)}
+    .callout.red .callout-label{color:var(--accent3)}
+
+    /* TAKEAWAYS */
+    .takeaways{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0}
+    .ta{border:1px solid var(--border2);background:var(--surface);padding:1.2rem;transition:border-color .3s,box-shadow .3s}
+    .ta:hover{border-color:var(--border);box-shadow:var(--glow)}
+    .ta-num{font-family:var(--BIG);font-size:2rem;color:rgba(0,255,65,.15);line-height:1;margin-bottom:.4rem}
+    .ta-text{font-size:12px;color:var(--muted);line-height:1.8}
+    .ta-text strong{color:var(--text);font-weight:400}
+
+    /* TIMELINE */
+    .timeline{position:relative;margin:1.5rem 0;padding-left:2rem}
+    .timeline::before{content:'';position:absolute;left:0;top:0;bottom:0;width:1px;background:var(--border)}
+    .tl-item{position:relative;margin-bottom:2rem}
+    .tl-item::before{content:'';position:absolute;left:-2rem;top:.5rem;width:8px;height:8px;background:var(--accent);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%)}
+    .tl-week{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:.2rem}
+    .tl-title{font-size:13px;color:var(--text);margin-bottom:.4rem}
+    .tl-desc{font-size:12px;color:var(--muted);line-height:1.8}
+
+    /* DIVIDER */
+    .divider{width:100%;height:1px;background:var(--border2);margin:4rem 0}
+
+    /* REVEAL */
+    .rv{opacity:0;transform:translateY(36px);transition:opacity .7s ease,transform .7s ease}
+    .rv.on{opacity:1;transform:none}
+    .d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
+
+    footer{padding:1.8rem 3rem;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center}
+    .ft-l{font-size:11px;letter-spacing:.08em;color:var(--muted)}
+    .ft-l span{color:var(--accent)}
+    .ft-r{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+    @media(max-width:768px){
+      nav{padding:1rem 1.5rem}
+      .nav-links{display:none}
+      #hero{padding:0 1.5rem 3rem;min-height:80vh}
+      .body{padding:4rem 1.5rem}
+      .takeaways,.toc-list{grid-template-columns:1fr}
+      .stat-row{gap:1.5rem}
+      footer{flex-direction:column;gap:.8rem;text-align:center}
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">48730 // LABS</div>
+    <ul class="nav-links">
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#tools">Tools</a></li>
+      <li><a href="#labs">Labs</a></li>
+      <li><a href="#skills">Skills</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section id="hero">
+    <div class="h-grid"></div>
+    <div class="h-orb"></div>
+    <div class="h-num">48730</div>
+
+    <p class="eyebrow">// Lab Write-Up · UTS · 48730/32548 · Autumn 2025</p>
+    <h1 class="hero-title">CYBER<br><span class="gr">SECURITY</span><br>LABS</h1>
+    <div class="meta-row">
+      <span class="badge">Network Security</span>
+      <span class="badge">Cryptography</span>
+      <span class="badge">IDS / IPS</span>
+      <span class="badge">Packet Analysis</span>
+      <span class="badge y">UTS 2025</span>
+      <span class="badge r">Blue &amp; Red Team</span>
+    </div>
+    <div class="stat-row">
+      <div class="ps"><span>9</span>Weeks</div>
+      <div class="ps"><span>12+</span>Tasks</div>
+      <div class="ps"><span>10+</span>Tools Used</div>
+      <div class="ps"><span>AU2025</span>Semester</div>
+    </div>
+  </section>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- TOC -->
+    <div class="toc rv">
+      <div class="toc-title">// TABLE OF CONTENTS</div>
+      <ul class="toc-list">
+        <li><a href="#overview">Subject Overview</a></li>
+        <li><a href="#tools">Tools &amp; Environment</a></li>
+        <li><a href="#wk2">Week 2 — Info Gathering &amp; Wireshark</a></li>
+        <li><a href="#wk23">Week 2–3 — Password Cracking &amp; SQL</a></li>
+        <li><a href="#wk3">Week 3 — DNS Pharming</a></li>
+        <li><a href="#wk4">Week 4 — Cryptography &amp; PKI</a></li>
+        <li><a href="#wk5">Week 5 — TCP/IP Attacks</a></li>
+        <li><a href="#wk6">Week 6 — Snort IDS/IPS</a></li>
+        <li><a href="#wk7">Week 7 — Juniper SRX Policies</a></li>
+        <li><a href="#wk9">Week 9 — iptables &amp; Firewall Auth</a></li>
+        <li><a href="#timeline">Lab Timeline</a></li>
+        <li><a href="#skills">Skills Learned</a></li>
+      </ul>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="ws rv" id="overview">
+      <div class="ws-label">01 · Overview</div>
+      <h2 class="ws-heading">SUBJECT<br>OVERVIEW</h2>
+      <p>
+        This document summarises the practical lab work completed throughout the
+        <strong>UTS subject 48730/32548 — Networking &amp; Cybersecurity</strong> in Autumn 2025.
+        The labs covered a wide range of cybersecurity fundamentals, from hands-on packet analysis
+        to configuring enterprise-grade network security on real Juniper SRX devices.
+      </p>
+      <p>
+        Each week built on the last — starting with passive information gathering, moving through
+        active attacks, encryption, intrusion detection, and finishing with enterprise firewall
+        configuration. The labs used both Linux-based virtual machines and physical network
+        infrastructure accessible via SSH through the <span class="hi">UTS network</span>.
+      </p>
+      <div class="callout">
+        <div class="callout-label">// Lab Environment</div>
+        <p>All VM-based labs ran inside a <strong>VMware</strong> environment with three VMs:
+        <strong>Cybersec-Server</strong> (10.0.2.6), <strong>Cybersec-Client</strong> (10.0.2.8),
+        and <strong>Cybersec-Attacker</strong> (10.0.2.7). Juniper labs connected through a
+        boundary router at <strong>138.25.62.61</strong> on the UTS campus network.</p>
+      </div>
+    </div>
+
+    <!-- TOOLS -->
+    <div class="ws rv" id="tools">
+      <div class="ws-label">02 · Tools &amp; Environment</div>
+      <h2 class="ws-heading">TOOLS &amp;<br>ENVIRONMENT</h2>
+      <p>The following tools and platforms were used across all lab sessions throughout the semester.</p>
+
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-name">WIRESHARK</div>
+          <div class="tool-cat">Packet Analysis</div>
+          <div class="tool-desc">Open-source packet capture and protocol analyser. Used for sniffing HTTP traffic, capturing DNS packets, and observing TCP/IP attacks in real time.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">NMAP / ZENMAP</div>
+          <div class="tool-cat">Port Scanning</div>
+          <div class="tool-desc">Network mapper used for aggressive port scans, OS detection, and service version discovery across target hosts.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">NETCRAFT</div>
+          <div class="tool-cat">OSINT / Recon</div>
+          <div class="tool-desc">Web-based OSINT tool for gathering information about a target domain — hosting, IP, OS, web server, and DNS records.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">JOHN THE RIPPER</div>
+          <div class="tool-cat">Password Cracking</div>
+          <div class="tool-desc">Password hash cracker supporting single, wordlist, and incremental (brute force) modes. Used against a Unix-style password file.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">OPENSSL</div>
+          <div class="tool-cat">Cryptography</div>
+          <div class="tool-desc">Used for symmetric (AES) and asymmetric (RSA) encryption/decryption, generating key pairs, creating Certificate Authorities, and signing server certificates.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">NETWAG</div>
+          <div class="tool-cat">Attack Simulation</div>
+          <div class="tool-desc">GUI frontend for Netwox packet crafting tools. Used to simulate TCP RST attacks, DNS spoofing, ICMP floods, and TCP session hijacking.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">SNORT</div>
+          <div class="tool-cat">IDS / IPS</div>
+          <div class="tool-desc">Open-source network intrusion detection and prevention system. Configured custom SPL rules, run in IDS mode and IPS mode to detect and reject network threats.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">IPTABLES</div>
+          <div class="tool-cat">Linux Firewall</div>
+          <div class="tool-desc">Linux kernel firewall utility. Used to configure INPUT/OUTPUT chain rules to permit HTTP/HTTPS and drop all other traffic on the server.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">JUNOS CLI</div>
+          <div class="tool-cat">Enterprise Firewall</div>
+          <div class="tool-desc">Juniper SRX operating system. Used to configure IDS screens, security zone policies, and pass-through firewall user authentication on real hardware.</div>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">DIG / NSLOOKUP</div>
+          <div class="tool-cat">DNS Tools</div>
+          <div class="tool-desc">Command-line DNS query tools used to verify DNS resolution before and after pharming attacks, observing changes in answer, authority, and additional sections.</div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="term-header">
+          <div class="term-dots"><span></span><span></span><span></span></div>
+          <span class="term-label">// key command patterns used across labs</span>
+        </div>
+        <div class="term-body">
+          <div class="comment"># Packet capture</div>
+          <div><span class="prompt">$ </span><span class="cmd">sudo wireshark</span></div>
+          <div class="comment"># Port scanning</div>
+          <div><span class="prompt">$ </span><span class="cmd">nmap -A -p- <span class="hi">&lt;target-ip&gt;</span></span></div>
+          <div class="comment"># Password cracking</div>
+          <div><span class="prompt">$ </span><span class="cmd">john --wordlist=password.lst <span class="hi">mypasswd</span></span></div>
+          <div class="comment"># Symmetric encryption</div>
+          <div><span class="prompt">$ </span><span class="cmd">openssl enc -aes-128-cbc -e -in <span class="hi">file.txt</span> -out Encrypted.enc -K &lt;key&gt; -iv 0000</span></div>
+          <div class="comment"># Snort IDS live console mode</div>
+          <div><span class="prompt">$ </span><span class="cmd">sudo snort -A console -q -c /etc/snort/snort.conf -i eth0</span></div>
+          <div class="comment"># iptables — drop all non-HTTP/S</div>
+          <div><span class="prompt">$ </span><span class="cmd">sudo iptables -A INPUT -p tcp --dport <span class="hi">80</span> -m state --state NEW,ESTABLISHED -j ACCEPT</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- LABS SECTION -->
+    <div class="ws rv" id="labs">
+      <div class="ws-label">03 · Lab Summaries</div>
+      <h2 class="ws-heading">LAB<br>SUMMARIES</h2>
+    </div>
+
+    <!-- WEEK 2 -->
+    <div class="ws rv" id="wk2">
+      <div class="ws-label">Week 2 · Lab 1 Part 1</div>
+      <h2 class="ws-heading">INFORMATION<br>GATHERING</h2>
+      <p>
+        The first lab introduced passive and active information gathering techniques.
+        The core theme was understanding how <strong>unencrypted traffic</strong> exposes sensitive data,
+        and how attackers can gather intelligence about a target before launching an attack.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 1</div>
+          <div class="lab-title">Sniffing HTTP Login Credentials</div>
+          <div class="lab-body">
+            Using Wireshark with promiscuous mode enabled, HTTP traffic was captured while logging
+            into an intentionally vulnerable test website. By filtering for <strong>POST packets</strong>,
+            the username and password transmitted in plaintext were clearly visible inside the
+            HTML Form URL-encoded data of the packet. This demonstrated why HTTP (without HTTPS)
+            is inherently insecure for transmitting credentials.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Wireshark</span>
+            <span class="lab-tool">HTTP</span>
+            <span class="lab-tool">Packet Filtering</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 2</div>
+          <div class="lab-title">Extracting Images from HTTP Traffic</div>
+          <div class="lab-body">
+            Using the same captured packet session, the <strong>Export Objects → HTTP</strong>
+            feature in Wireshark was used to extract image files (logo.gif) directly from the
+            packet capture. This showed how any file transmitted over unencrypted HTTP can be
+            fully reconstructed from captured traffic.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Wireshark</span>
+            <span class="lab-tool">HTTP Object Export</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 3</div>
+          <div class="lab-title">OSINT on uts.edu.au</div>
+          <div class="lab-body">
+            Zenmap and NetCraft were used to gather public information about <strong>www.uts.edu.au</strong>.
+            Findings included IP address, hosting company, operating system, web server type, DNS admin
+            email, reverse DNS, domain registrar, and nameserver organisation. Typing the bare IP
+            into a browser returned a Cloudflare Error 1003 — showing that direct IP access is blocked
+            by the CDN. This task highlighted how much infrastructure information is publicly accessible.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">NetCraft</span>
+            <span class="lab-tool">Zenmap</span>
+            <span class="lab-tool r">OSINT</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <div class="callout-label">// Key Learning</div>
+        <p>Unencrypted HTTP transmits all data including credentials in plaintext. Any attacker on the
+        same network can capture and read this data using nothing more than Wireshark.
+        <strong>HTTPS is non-negotiable for any login or sensitive form.</strong></p>
+      </div>
+    </div>
+
+    <!-- WEEK 2-3 -->
+    <div class="ws rv" id="wk23">
+      <div class="ws-label">Week 2–3 · Lab 1 Part 2</div>
+      <h2 class="ws-heading">PASSWORD CRACKING<br>&amp; SQL INJECTION</h2>
+      <p>
+        The second part of Lab 1 moved into offensive techniques using a local Cybersec-Server VM.
+        The two main areas were cracking hashed passwords and exploiting SQL injection vulnerabilities
+        in a login form.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 4</div>
+          <div class="lab-title">Password Cracking with John the Ripper</div>
+          <div class="lab-body">
+            A Unix-style password file (<strong>mypasswd</strong>) was cracked using John the Ripper's
+            three modes. Single crack mode broke simple username-based passwords almost instantly.
+            Wordlist mode used a dictionary (password.lst) to crack more complex ones. The --rules
+            flag applied mangling transformations to the wordlist, eventually cracking even the most
+            resistant password in the file. This reinforced how weak passwords — especially dictionary
+            words — fall quickly against automated tools.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">John the Ripper</span>
+            <span class="lab-tool">Hash Cracking</span>
+            <span class="lab-tool">Wordlist Attack</span>
+            <span class="lab-tool r">Brute Force</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 5</div>
+          <div class="lab-title">SQL Injection — Login Bypass</div>
+          <div class="lab-body">
+            A locally hosted PHP/MySQL login page was exploited using classic SQL injection.
+            By entering a single quote <strong>'</strong> in the username field, a MySQL syntax error
+            was triggered, confirming the database type. The login was then bypassed by injecting
+            an always-true SQL condition into the password field. Further exploitation dumped
+            all usernames and passwords from the database to a file using SQL's outfile capability.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool r">SQL Injection</span>
+            <span class="lab-tool">MySQL</span>
+            <span class="lab-tool">PHP</span>
+            <span class="lab-tool">Login Bypass</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 6</div>
+          <div class="lab-title">Port Scanning with Nmap</div>
+          <div class="lab-body">
+            An aggressive (-A) port scan was run from the Attacker VM against both
+            Cybersec-Server and Cybersec-Client using Zenmap's GUI. The scan revealed
+            open ports including <strong>FTP (21)</strong>, <strong>SSH (22)</strong>,
+            <strong>Telnet (23)</strong>, <strong>DNS (53)</strong>, and
+            <strong>HTTP (80)</strong> on the server, along with running service versions.
+            This demonstrated how an attacker maps a network before exploiting services.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Nmap</span>
+            <span class="lab-tool">Zenmap</span>
+            <span class="lab-tool">Service Detection</span>
+            <span class="lab-tool">OS Fingerprinting</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEEK 3 -->
+    <div class="ws rv" id="wk3">
+      <div class="ws-label">Week 3 · Lab 2</div>
+      <h2 class="ws-heading">DNS<br>PHARMING</h2>
+      <p>
+        This lab explored how DNS can be manipulated to redirect users to attacker-controlled
+        addresses — a technique known as <strong>pharming</strong>. Three attack methods
+        were demonstrated, each escalating in sophistication.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 1</div>
+          <div class="lab-title">Attack via Interfaces File</div>
+          <div class="lab-body">
+            The <strong>dns-nameserver</strong> entry in /etc/network/interfaces was changed
+            to point to a rogue DNS server (10.0.2.7). After rebooting the network interface,
+            the dig command confirmed that DNS queries were now being resolved by the attacker's
+            server instead of the legitimate one — silently redirecting all hostname lookups.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">dig</span>
+            <span class="lab-tool">nano</span>
+            <span class="lab-tool r">DNS Hijacking</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 2</div>
+          <div class="lab-title">DNS Response Spoofing (Netwag Tool 105)</div>
+          <div class="lab-body">
+            Netwag's Tool 105 — "Sniff and send DNS answers" — was configured on the Attacker VM
+            to intercept DNS queries for a target hostname and inject a forged DNS response with
+            a spoofed IP. Wireshark on the Client VM captured both the legitimate response and
+            the spoofed response arriving almost simultaneously. This is a classic
+            <strong>race condition</strong> attack on DNS.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Netwag (Tool 105)</span>
+            <span class="lab-tool">Wireshark</span>
+            <span class="lab-tool r">DNS Spoofing</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 3</div>
+          <div class="lab-title">DNS Cache Poisoning</div>
+          <div class="lab-body">
+            The same Netwag tool was used but now targeting the DNS cache on the server itself.
+            After flushing the DNS cache with <strong>sudo rndc flush</strong>, repeated
+            dig queries were sent for www.uts.edu.au while Tool 105 was running with a spoofed
+            authoritative nameserver. Eventually the forged response was cached, and the authority
+            and additional sections of the dig output reflected the attacker's nameserver.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Netwag (Tool 105)</span>
+            <span class="lab-tool">dig</span>
+            <span class="lab-tool">rndc</span>
+            <span class="lab-tool r">Cache Poisoning</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout red">
+        <div class="callout-label">// Security Implication</div>
+        <p>DNS is fundamentally trust-based and unauthenticated in its basic form. These attacks
+        show why <strong>DNSSEC</strong> exists — without cryptographic signing of DNS records,
+        spoofed responses are indistinguishable from legitimate ones.</p>
+      </div>
+    </div>
+
+    <!-- WEEK 4 -->
+    <div class="ws rv" id="wk4">
+      <div class="ws-label">Week 4 · Lab 3</div>
+      <h2 class="ws-heading">CRYPTOGRAPHY<br>&amp; PKI</h2>
+      <p>
+        This was one of the most involved labs, covering the full lifecycle of
+        <strong>cryptographic operations</strong> from basic symmetric encryption through
+        to operating a Certificate Authority and serving HTTPS.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 1</div>
+          <div class="lab-title">Symmetric Encryption with OpenSSL (AES-128-CBC)</div>
+          <div class="lab-body">
+            A text file and a BMP image were encrypted and decrypted using AES-128-CBC via
+            OpenSSL. The encrypted text file appeared as garbled characters when cat was run on it.
+            Interestingly, encrypting the BMP image in ECB mode preserved some visual patterns
+            (a known weakness of ECB), while CBC mode produced a fully scrambled result —
+            demonstrating the practical difference between cipher modes.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">OpenSSL</span>
+            <span class="lab-tool">AES-128-CBC</span>
+            <span class="lab-tool">Symmetric Encryption</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 2</div>
+          <div class="lab-title">Asymmetric Encryption (RSA)</div>
+          <div class="lab-body">
+            An RSA key pair (2048-bit) was generated. A text file was encrypted with the
+            <strong>public key</strong> and decrypted with the <strong>private key</strong>.
+            The encrypted output was unreadable binary data. This demonstrated the core principle
+            of public-key cryptography — only the private key holder can decrypt content
+            encrypted with the corresponding public key.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">OpenSSL</span>
+            <span class="lab-tool">RSA 2048-bit</span>
+            <span class="lab-tool">Public Key Crypto</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 3 &amp; 4</div>
+          <div class="lab-title">Certificate Authority &amp; Certificate Signing</div>
+          <div class="lab-body">
+            A self-signed <strong>Certificate Authority (CA)</strong> was created using OpenSSL with
+            organisation details (UTS/FEIT). A Certificate Signing Request (CSR) was then generated
+            for cybersec.com.au and signed by the CA to produce a server certificate. This mirrors
+            exactly how real-world TLS certificates are issued by trusted CAs.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">OpenSSL</span>
+            <span class="lab-tool">X.509</span>
+            <span class="lab-tool">CA / CSR</span>
+            <span class="lab-tool y">PKI</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 5</div>
+          <div class="lab-title">Running an HTTPS Server</div>
+          <div class="lab-body">
+            The server certificate and private key were combined into a PEM file and used
+            to launch an OpenSSL HTTPS test server. After importing the CA certificate into
+            Firefox's certificate store, browsing to <strong>https://cybersec.com.au:4433</strong>
+            showed a secure padlock — confirming the full PKI chain was working correctly.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">OpenSSL s_server</span>
+            <span class="lab-tool">HTTPS / TLS</span>
+            <span class="lab-tool y">PKI</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEEK 5 -->
+    <div class="ws rv" id="wk5">
+      <div class="ws-label">Week 5 · Lab 4</div>
+      <h2 class="ws-heading">TCP/IP<br>ATTACKS</h2>
+      <p>
+        This lab focused on active attacks against established TCP/IP connections —
+        demonstrating how network sessions can be disrupted, hijacked, and manipulated
+        at the packet level without any access to application-layer credentials.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 4</div>
+          <div class="lab-title">TCP RST Attack on Telnet &amp; SSH</div>
+          <div class="lab-body">
+            Netwag Tool 78 — "Reset every TCP packet" — was run on the Attacker VM while
+            a Telnet session was active between the Server and Client. Every time data was
+            typed in the Telnet session, Wireshark captured <strong>RST/ACK packets</strong>
+            arriving on the Client, causing the connection to drop with "Connection closed by
+            foreign host." The same attack was repeated against an SSH session with identical results.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Netwag (Tool 78)</span>
+            <span class="lab-tool">Wireshark</span>
+            <span class="lab-tool">Telnet</span>
+            <span class="lab-tool r">TCP RST</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 5a</div>
+          <div class="lab-title">ICMP Blind Connection-Reset</div>
+          <div class="lab-body">
+            Netwag Tool 82 — "Sniff and send ICMP4 destination unreachable" — injected forged
+            ICMP Type 3 Code 2 packets while the Client was pinging the Server. Wireshark showed
+            the ping replies being overridden by "Destination Host Unreachable" messages from the
+            attacker's spoofed IP, disrupting the ICMP connection stream.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Netwag (Tool 82)</span>
+            <span class="lab-tool">Wireshark</span>
+            <span class="lab-tool r">ICMP Spoofing</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 5b</div>
+          <div class="lab-title">ICMP Source Quench Attack</div>
+          <div class="lab-body">
+            Tool 85 sent forged ICMP Type 4 (Source Quench) messages, telling the TCP sender
+            to slow down. While pinging, "Source Quench" messages appeared interleaved with
+            echo replies in the Wireshark capture, simulating a congestion signal that
+            could degrade or disrupt TCP throughput.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Netwag (Tool 85)</span>
+            <span class="lab-tool r">ICMP Type 4</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 6</div>
+          <div class="lab-title">TCP Session Hijacking</div>
+          <div class="lab-body">
+            This was the most complex task. An active Telnet session's sequence and
+            acknowledgement numbers were read from Wireshark (with relative sequence numbers
+            disabled). The command <strong>mkdir jason</strong> was converted to hex and
+            injected as a forged TCP packet using Netwag Tool 36, spoofing the server's
+            source IP and port. The Client's Wireshark showed the forged telnet data arriving,
+            and running <code>ls</code> on the client confirmed a new directory had been created
+            — demonstrating a full TCP session hijack.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Netwag (Tool 36)</span>
+            <span class="lab-tool">Wireshark</span>
+            <span class="lab-tool">Telnet</span>
+            <span class="lab-tool r">Session Hijacking</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEEK 6 -->
+    <div class="ws rv" id="wk6">
+      <div class="ws-label">Week 6 · Lab 5</div>
+      <h2 class="ws-heading">SNORT<br>IDS / IPS</h2>
+      <p>
+        Snort was introduced as both a network <strong>Intrusion Detection System (IDS)</strong>
+        and an <strong>Intrusion Prevention System (IPS)</strong>. Custom rules were written and
+        tested against real attack traffic generated from the Attacker VM.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 1–3</div>
+          <div class="lab-title">Writing Custom Snort Detection Rules</div>
+          <div class="lab-body">
+            Three detection rules were added to <strong>/etc/snort/rules/local.rules</strong>:
+            a rule to alert on any ICMP packet, a rule to alert on web access (TCP port 80),
+            and a rule to specifically detect ICMP Source Quench packets (type 4, code 0).
+            Alerts were verified by reading <strong>/var/log/snort/alert</strong> and by
+            running Snort in live console mode. Each rule used a unique SID above 1000000.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Snort</span>
+            <span class="lab-tool">Snort Rules (SPL)</span>
+            <span class="lab-tool">ICMP / TCP</span>
+            <span class="lab-tool y">IDS Mode</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 4–5</div>
+          <div class="lab-title">Snort as IPS — Rejecting SSH &amp; Telnet</div>
+          <div class="lab-body">
+            Using the <strong>reject</strong> action (instead of alert), Snort was configured
+            to actively block SSH connection attempts to port 22 and Telnet attempts to port 23.
+            When the Attacker VM tried to connect, it received "Connection reset by peer" — the
+            connection was terminated by Snort sending a TCP RST before it could be established.
+            Live console output confirmed the rejection events as they happened.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Snort</span>
+            <span class="lab-tool r">IPS Mode</span>
+            <span class="lab-tool">TCP Reject</span>
+            <span class="lab-tool">SSH / Telnet</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 6</div>
+          <div class="lab-title">Juniper SRX IDS — UDP Flood Threshold</div>
+          <div class="lab-body">
+            Connected to a real Juniper SRX router via SSH through the UTS boundary router.
+            Inside the <strong>edit security screen ids-option untrust-screen</strong> hierarchy,
+            a UDP flood threshold of <strong>1024 packets/second</strong> was set. The show command
+            confirmed the new UDP flood configuration appeared under the existing TCP syn-flood
+            and land attack protections. The rule was then deleted to restore default config.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Juniper SRX</span>
+            <span class="lab-tool">JUNOS CLI</span>
+            <span class="lab-tool y">IDS Screen</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="term-header">
+          <div class="term-dots"><span></span><span></span><span></span></div>
+          <span class="term-label">// example snort rule structure used in lab</span>
+        </div>
+        <div class="term-body">
+          <div class="comment"># Alert rule (IDS) — detect ICMP</div>
+          <div><span class="hi">alert</span> <span class="cmd">icmp any any -> any any (msg:"ICMP Packet found"; sid:1000001; rev:1;)</span></div>
+          <br>
+          <div class="comment"># Reject rule (IPS) — block SSH connection attempts</div>
+          <div><span class="hi">reject</span> <span class="cmd">tcp any any -> 10.0.2.6 22 (msg:"SSH Connection Attempt"; sid:1000004; rev:1;)</span></div>
+          <br>
+          <div class="comment"># ICMP type/code specific detection</div>
+          <div><span class="hi">alert</span> <span class="cmd">icmp any any -> any any (msg:"Source Quench"; itype:4; icode:0; sid:1000003; rev:1;)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEEK 7 -->
+    <div class="ws rv" id="wk7">
+      <div class="ws-label">Week 7 · Lab 6</div>
+      <h2 class="ws-heading">JUNIPER SRX<br>SECURITY POLICIES</h2>
+      <p>
+        Building on the Week 6 Juniper introduction, this lab focused on configuring
+        <strong>zone-based security policies</strong> on the Juniper SRX to control traffic
+        between the Internet zone and the Internal zone.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// Task 1</div>
+          <div class="lab-title">Exploring Default Security Policies</div>
+          <div class="lab-body">
+            After rolling back to rescue configuration, the existing policies were inspected
+            using <strong>show security policies</strong>. The default setup had two permit-all
+            policies: one for Internet→Internal traffic and one for Internal→Internet traffic,
+            both matching any source, destination, and application. This "allow everything" default
+            was the baseline to understand before adding more specific controls.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">JUNOS CLI</span>
+            <span class="lab-tool">Juniper SRX</span>
+            <span class="lab-tool">Security Zones</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 2</div>
+          <div class="lab-title">Configuring FTP Access Policy</div>
+          <div class="lab-body">
+            New security policies were added for both directions (Internet→Internal and
+            Internal→Internet) using the application <strong>junos-ftp</strong> to permit
+            only FTP traffic. The policy structure followed the template: from-zone, to-zone,
+            policy name, match criteria (source/destination/application), and then action (permit).
+            This created a controlled whitelist for a specific application.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">JUNOS CLI</span>
+            <span class="lab-tool">junos-ftp</span>
+            <span class="lab-tool y">Zone Policy</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// Task 3 (Challenge)</div>
+          <div class="lab-title">Rejecting Telnet Access</div>
+          <div class="lab-body">
+            The challenge required creating policies using <strong>junos-telnet</strong> with
+            a <strong>reject</strong> action for both directions between zones. This prevents
+            Telnet traffic from traversing the firewall in either direction, while the
+            existing permit-all policy would still allow other traffic types.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">JUNOS CLI</span>
+            <span class="lab-tool">junos-telnet</span>
+            <span class="lab-tool r">Reject Action</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEEK 9 -->
+    <div class="ws rv" id="wk9">
+      <div class="ws-label">Week 9 · Lab 7</div>
+      <h2 class="ws-heading">IPTABLES &amp;<br>FIREWALL AUTH</h2>
+      <p>
+        The final labs covered Linux firewall configuration with iptables and
+        enterprise-grade user authentication on the Juniper SRX using
+        <strong>pass-through authentication</strong>.
+      </p>
+
+      <div class="lab-list">
+        <div class="lab-card">
+          <div class="lab-week">// iptables Challenge</div>
+          <div class="lab-title">Permitting HTTP/HTTPS, Dropping All Other Traffic</div>
+          <div class="lab-body">
+            Three iptables rules were added to the INPUT chain on Cybersec-Server:
+            ACCEPT TCP port 80 for NEW and ESTABLISHED connections,
+            ACCEPT TCP port 443 for NEW and ESTABLISHED connections,
+            and a final DROP rule for all remaining traffic. The ordered chain is critical —
+            iptables processes rules top-to-bottom, so specific ACCEPT rules must come
+            before the catch-all DROP. Running <strong>sudo iptables -L</strong> confirmed
+            the chain was configured correctly.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">iptables</span>
+            <span class="lab-tool">HTTP (80)</span>
+            <span class="lab-tool">HTTPS (443)</span>
+            <span class="lab-tool r">DROP rule</span>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-week">// JUNOS — Firewall User Auth</div>
+          <div class="lab-title">Pass-Through Authentication on Juniper SRX</div>
+          <div class="lab-body">
+            An access profile was created with a named client and firewall-user password.
+            This profile was associated with pass-through authentication in the
+            <strong>access firewall-authentication</strong> hierarchy, with a
+            success banner configured for Telnet. A security policy was then created
+            to match junos-telnet traffic with a permit action that required
+            <strong>firewall-authentication pass-through client-match</strong> —
+            meaning users must authenticate before the Telnet session is allowed through.
+          </div>
+          <div class="lab-tools">
+            <span class="lab-tool">Juniper SRX</span>
+            <span class="lab-tool">JUNOS CLI</span>
+            <span class="lab-tool y">Pass-Through Auth</span>
+            <span class="lab-tool">Access Profiles</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- TIMELINE -->
+    <div class="ws rv" id="timeline">
+      <div class="ws-label">04 · Timeline</div>
+      <h2 class="ws-heading">LAB<br>TIMELINE</h2>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-week">Week 2 — Jul/Aug 2025</div>
+          <div class="tl-title">Lab 1 Part 1 — Information Gathering &amp; Wireshark</div>
+          <div class="tl-desc">HTTP sniffing, image extraction, OSINT with NetCraft and Zenmap</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 2–3</div>
+          <div class="tl-title">Lab 1 Part 2 — Password Cracking, SQL Injection &amp; Port Scanning</div>
+          <div class="tl-desc">John the Ripper, MySQL SQLi, Nmap/Zenmap service discovery</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 3 — Aug 2025</div>
+          <div class="tl-title">Lab 2 — DNS Pharming</div>
+          <div class="tl-desc">Interfaces file manipulation, Netwag DNS spoofing, DNS cache poisoning</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 4 — Aug 2025</div>
+          <div class="tl-title">Lab 3 — Cryptography &amp; PKI</div>
+          <div class="tl-desc">AES symmetric, RSA asymmetric, CA creation, CSR signing, HTTPS server</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 5 — Aug 2025</div>
+          <div class="tl-title">Lab 4 — TCP/IP Attacks</div>
+          <div class="tl-desc">TCP RST, ICMP blind reset, source quench, session hijacking</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 6 — Sep 2025</div>
+          <div class="tl-title">Lab 5 — Snort IDS/IPS</div>
+          <div class="tl-desc">Custom Snort rules, IDS alerting, IPS rejection, Juniper SRX IDS screens</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 7 — Sep 2025</div>
+          <div class="tl-title">Lab 6 — Juniper SRX Security Policies</div>
+          <div class="tl-desc">Zone-based policies, FTP permit, Telnet reject, JUNOS CLI</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-week">Week 9 — Sep/Oct 2025</div>
+          <div class="tl-title">Lab 7 — iptables &amp; Firewall User Authentication</div>
+          <div class="tl-desc">Linux iptables rules, Juniper pass-through authentication</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SKILLS -->
+    <div class="ws rv" id="skills">
+      <div class="ws-label">05 · Lessons Learned</div>
+      <h2 class="ws-heading">SKILLS<br>LEARNED</h2>
+      <p>Across the semester, these labs built a layered understanding of cybersecurity
+      from the ground up — connecting theory to hands-on practice with real tools.</p>
+      <div class="takeaways">
+        <div class="ta">
+          <div class="ta-num">01</div>
+          <div class="ta-text"><strong>Packet Analysis</strong> — Reading and interpreting raw network traffic in Wireshark to find credentials, images, and protocol-level attack patterns across TCP, UDP, ICMP, DNS, and Telnet.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">02</div>
+          <div class="ta-text"><strong>Offensive Techniques</strong> — Understanding how SQL injection, password cracking, DNS spoofing, TCP session hijacking, and ICMP attacks actually work at a technical level — not just theoretically.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">03</div>
+          <div class="ta-text"><strong>Cryptography in Practice</strong> — Applying AES and RSA encryption, understanding the difference between cipher modes (ECB vs CBC), and building a complete PKI chain from scratch with OpenSSL.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">04</div>
+          <div class="ta-text"><strong>Intrusion Detection &amp; Prevention</strong> — Writing Snort rules from scratch, understanding the difference between IDS (alert) and IPS (reject), and tuning rules for specific protocols and ICMP codes.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">05</div>
+          <div class="ta-text"><strong>Enterprise Firewall Config</strong> — Navigating the JUNOS CLI (shell, operational, and configuration modes), configuring security zones, policies, IDS screens, and firewall user authentication on real Juniper SRX hardware.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">06</div>
+          <div class="ta-text"><strong>Linux Security Tooling</strong> — Using iptables to build stateful firewall rules on Linux, understanding rule ordering, and applying the principle of least privilege to network access control.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">07</div>
+          <div class="ta-text"><strong>Password Security</strong> — Seeing firsthand how quickly weak and dictionary-based passwords fall to automated cracking tools, reinforcing the importance of long, random, non-dictionary passwords.</div>
+        </div>
+        <div class="ta">
+          <div class="ta-num">08</div>
+          <div class="ta-text"><strong>Threat Mindset</strong> — Thinking from the attacker's perspective first — understanding how vulnerabilities are discovered and exploited — to then reason about what defences are actually effective.</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">// Final Reflection</div>
+        <p>The biggest takeaway from these labs is that most attacks exploit
+        <strong>well-known, preventable weaknesses</strong> — unencrypted protocols, weak passwords,
+        unvalidated inputs, and misconfigured services. Cybersecurity is less about exotic zero-days
+        and more about getting the fundamentals right. Tools like Wireshark and Snort make
+        the invisible visible — and understanding how attacks look in packet captures is invaluable
+        for anyone working in a defensive security role.</p>
+      </div>
+    </div>
+
+  </div><!-- /body -->
+
+  <footer>
+    <div class="ft-l">48730 / 32548 · <span>UTS Cybersecurity</span> · Autumn 2025</div>
+    <div class="ft-r">Networking &amp; Cybersecurity · Grad 2027</div>
+  </footer>
+
+  <script>
+    window.addEventListener('scroll',()=>{
+      document.getElementById('progress').style.width=(scrollY/(document.body.scrollHeight-innerHeight)*100)+'%';
+    });
+    const ro=new IntersectionObserver(es=>es.forEach(e=>{
+      if(e.isIntersecting)e.target.classList.add('on');
+    }),{threshold:.08});
+    document.querySelectorAll('.rv').forEach(el=>ro.observe(el));
+  </script>
+</body>
+</html>
+</html>
